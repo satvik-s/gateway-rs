@@ -1,0 +1,17 @@
+[[servers]]
+endpoint = "http://127.0.0.1:3000"
+name = "server1"
+
+[[routes]]
+name = "route1"
+path = "/gateway-route-one"
+method = "get"
+server = "server1"
+server_path = "/server-route-1"
+
+[[routes]]
+name = "route2"
+path = "/gateway-route-two"
+method = "get"
+server = "server1"
+server_path = "/server-route-2"
