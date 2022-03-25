@@ -11,9 +11,14 @@ use axum::{
 };
 use hyper::{client::Client, client::HttpConnector, Body, Method, StatusCode};
 use std::sync::Arc;
-use tokio::{signal, time::Instant};
-use tracing::{info, instrument};
-
+use tokio::signal;
+use tower_http::{
+    catch_panic::CatchPanicLayer,
+    compression::CompressionLayer,
+    trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer},
+    LatencyUnit,
+};
+use tracing::{info, instrument, Level};
 use types::{Config, State};
 
 const ADDRESS: &str = "127.0.0.1:4000";
@@ -47,9 +52,22 @@ async fn main() {
     };
     app = app
         .layer(AddExtensionLayer::new(Arc::new(state)))
+        .layer(CompressionLayer::new())
+        .layer(CatchPanicLayer::new())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new())
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(
+                    DefaultOnResponse::new()
+                        .level(Level::INFO)
+                        .latency_unit(LatencyUnit::Micros),
+                ),
+        )
         .fallback(handler_404.into_service());
 
     info!("reverse proxy listening on {}", ADDRESS);
+
     axum::Server::bind(&ADDRESS.parse().unwrap())
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown_signal())
@@ -61,11 +79,9 @@ async fn handler(
     Extension(state): Extension<Arc<State>>,
     mut req: Request<Body>,
 ) -> Response<Body> {
-    let now = Instant::now();
     let path = req.uri().path();
     let query = req.uri().query().unwrap_or_default();
     // let path_query = req.uri().path_and_query().map(|v| v.as_str()).unwrap();
-    info!("incoming request to {}{}", ADDRESS, path);
 
     let matched_route_and_server =
         utils::get_matched_route_and_server(path, &state.processed_config).unwrap();
@@ -83,12 +99,9 @@ async fn handler(
         ),
     };
 
-    info!("outgoing request to {}", uri);
     *req.uri_mut() = Uri::try_from(uri).unwrap();
 
     let response = state.client.request(req).await.unwrap();
-    let elapsed = now.elapsed();
-    info!("elapsed time {:.3?}", elapsed);
 
     return response;
 }
