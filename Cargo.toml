@@ -11,7 +11,7 @@ hyper = { version = "0.14.17", features = ["full"] }
 serde = "1.0.136"
 serde_derive = "1.0.136"
 serde_json = { version = "1.0.79", features = ["std"] }
-tokio = { version = "1.17.0", features = ["full"] }
+tokio = { version = "1.18.4", features = ["full"] }
 toml = "0.5.8"
 tower = "0.4.12"
 tower-http = { version = "0.2.5", features = [
